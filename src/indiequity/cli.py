@@ -56,6 +56,29 @@ app = typer.Typer(
 console = Console()
 
 
+def version_callback(value: bool):
+    """Callback to print version and exit."""
+    if value:
+        import indiequity
+        rprint(f"[bold cyan]indiequity[/bold cyan] version [bold green]{indiequity.__version__}[/bold green]")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: Optional[bool] = typer.Option(
+        None,
+        "--version",
+        "-v",
+        help="Show indiequity version and exit.",
+        callback=version_callback,
+        is_eager=True,
+    ),
+):
+    """Indian Equity Research Toolkit for fundamental analysis, DuPont, screening, and DCF valuation."""
+    pass
+
+
 @app.command()
 def quote(symbol: str = typer.Argument(..., help="NSE or BSE stock ticker (e.g. 'TATAMOTORS' or 'ITC')")):
     """Display quick market profile and key figures for an Indian stock."""

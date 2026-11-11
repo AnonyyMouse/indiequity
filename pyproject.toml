@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "indiequity"
-version = "0.2.1"
+version = "0.2.2"
 description = "Indian equity research toolkit for NSE/BSE fundamental analysis, ratios, screening, and DCF valuation."
 readme = "README.md"
 authors = [

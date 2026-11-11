@@ -73,7 +73,7 @@ from indiequity.screener import (
     StockScreener,
 )
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 __author__ = "Ayush"
 
 __all__ = [

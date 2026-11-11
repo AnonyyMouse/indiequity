@@ -11,6 +11,7 @@ Provides:
 - Visual charting and Excel/CSV export
 """
 
+from indiequity.cache import FinancialCache
 from indiequity.config import (
     CRORE_DIVISOR,
     DEFAULT_EQUITY_RISK_PREMIUM,
@@ -29,6 +30,15 @@ from indiequity.dupont import (
     decompose_dupont_5stage,
 )
 from indiequity.ratios import RatioMetrics, calculate_ratios
+from indiequity.screener import (
+    NIFTY_50_TICKERS,
+    NIFTY_SMALLCAP_PRESET,
+    PRESET_DEEP_VALUE,
+    PRESET_HIGH_COMPOUNDER,
+    PRESET_QUALITY_SMALLCAP,
+    ScreenerCriteria,
+    StockScreener,
+)
 
 __version__ = "0.1.0"
 __author__ = "Ayush"
@@ -43,6 +53,7 @@ __all__ = [
     "format_crores",
     "format_percentage",
     "resolve_ticker",
+    "FinancialCache",
     "FinancialProfile",
     "fetch_company_data",
     "RatioMetrics",
@@ -51,4 +62,11 @@ __all__ = [
     "DuPont5Stage",
     "decompose_dupont_3stage",
     "decompose_dupont_5stage",
+    "NIFTY_50_TICKERS",
+    "NIFTY_SMALLCAP_PRESET",
+    "ScreenerCriteria",
+    "StockScreener",
+    "PRESET_QUALITY_SMALLCAP",
+    "PRESET_DEEP_VALUE",
+    "PRESET_HIGH_COMPOUNDER",
 ]

@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Indian equity research toolkit for NSE/BSE fundamental analysis, ratios, screening, and DCF valuation."
 readme = "README.md"
 authors = [
-    { name = "Ayush", email = "research@indiequity.local" }
+    { name = "Ayush", email = "anon.yy.mouse.712@gmail.com" }
 ]
 license = { text = "MIT" }
 classifiers = [

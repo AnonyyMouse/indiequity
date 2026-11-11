@@ -10,6 +10,7 @@ Provides:
 - Configurable stock screening with preset Indian investment strategies
 - 5-Year and 10-Year FCFF DCF valuation with sustainable terminal reinvestment & 2D sensitivity
 - Bank and Financial Institution Residual Income Model (RIM) & Justified P/B
+- Transparent Model Routing (Banks, Lending NBFCs, AMCs, Conglomerates, Industrials)
 - Reverse DCF & Scenario Analysis (Bear/Base/Bull)
 - Visual charting and multi-tab Excel/CSV export
 """
@@ -26,9 +27,15 @@ from indiequity.config import (
     format_percentage,
     resolve_ticker,
 )
-from indiequity.data import FinancialProfile, fetch_company_data
+from indiequity.data import (
+    BusinessCategory,
+    FinancialProfile,
+    classify_business,
+    fetch_company_data,
+)
 from indiequity.dcf import (
     AnnualForecast,
+    BankAnnualForecast,
     DCFResult,
     EnterpriseToEquityBridge,
     ForecastAssumptions,
@@ -66,7 +73,7 @@ from indiequity.screener import (
     StockScreener,
 )
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 __author__ = "Ayush"
 
 __all__ = [
@@ -80,6 +87,8 @@ __all__ = [
     "format_percentage",
     "resolve_ticker",
     "FinancialCache",
+    "BusinessCategory",
+    "classify_business",
     "FinancialProfile",
     "fetch_company_data",
     "CapitalStructure",
@@ -98,6 +107,7 @@ __all__ = [
     "PRESET_DEEP_VALUE",
     "PRESET_HIGH_COMPOUNDER",
     "AnnualForecast",
+    "BankAnnualForecast",
     "EnterpriseToEquityBridge",
     "ForecastAssumptions",
     "DCFResult",

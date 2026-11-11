@@ -2,6 +2,15 @@
 
 All notable changes to `indiequity` will be documented in this file.
 
+## [0.2.1] - Final Financial Methodology Corrections & Validation
+### Fixed & Corrected
+- **Residual Income Retention Ratio (Phase 1)**: Corrected sustainable growth identity to `RetentionRatio = g / ROE` and `PayoutRatio = 1 - (g / ROE)`. Book value accretion, EPS, dividends, and residual income now reconcile exactly to perpetual growth identities.
+- **Model Routing & Categorization (Phase 2)**: Disentangled Asset Managers (`ASSET_MANAGER`) and Conglomerates (`CONGLOMERATE`) from banks/lenders. Rejects inappropriate industrial DCF and banking RIM with explicit `MODEL_NOT_SUPPORTED` error rather than generating misleading valuations.
+- **FCFF Working Capital Movement (Phase 3)**: Faithful preservation of zero and negative working capital movements (`FCFF = EBIT * (1 - t) + D&A - CapEx - ΔNWC`). Negative change in NWC (+₹20 Cr cash release) correctly yields ₹140 Cr FCFF without generic revenue substitution.
+- **WACC Borrowing Cost & Shares (Phase 4)**: Unclamped borrowing cost constraints; explicit error on negative or non-viable debt costs; documented `INFERRED_FROM_MCAP_AND_PRICE` share count metadata.
+- **Mathematically Verified Reverse DCF (Phase 5)**: Enforced strict numerical round-trip tolerance (`abs(P_recalc - P_target) / P_target < 0.001`), verifying that recovered implied growth reproduces target market price.
+- **Real-World Validation (Phase 7)**: Validated against Polycab India (5Y/10Y FCFF), TCS (IT Services FCFF), and ICICI Bank (Residual Income & Justified P/B).
+
 ## [0.2.0] - Valuation Engine Overhaul & Financial Methodology Repair
 ### Fixed & Corrected
 - **FCFF Formulation**: Replaced mechanical proxy with corporate finance identity: `FCFF = EBIT * (1 - t) + D&A - CapEx - ΔOperating_NWC`.

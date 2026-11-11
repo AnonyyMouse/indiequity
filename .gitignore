@@ -52,3 +52,9 @@ htmlcov/
 *.sqlite3
 cache/
 data/
+
+# Export outputs and charts
+*.xlsx
+*.csv
+*.png
+*.pdf

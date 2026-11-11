@@ -5,7 +5,7 @@ Commands:
 - indiequity quote <ticker>
 - indiequity ratios <ticker>
 - indiequity dupont <ticker>
-- indiequity dcf <ticker>
+- indiequity dcf <ticker> [--growth ...] [--wacc ...] [--scenarios] [--reverse]
 - indiequity screen [--preset ...]
 - indiequity export <ticker>
 - indiequity chart <ticker>
@@ -27,7 +27,15 @@ from indiequity.config import (
     format_percentage,
 )
 from indiequity.data import fetch_company_data
-from indiequity.dcf import calculate_dcf
+from indiequity.dcf import (
+    ForecastAssumptions,
+    InvalidValuationInputError,
+    UnsupportedValuationModelError,
+    calculate_dcf,
+    calculate_residual_income_valuation,
+    reverse_dcf,
+    run_scenario_analysis,
+)
 from indiequity.dupont import decompose_dupont_3stage, decompose_dupont_5stage
 from indiequity.export import export_screener_to_excel, export_to_excel
 from indiequity.ratios import calculate_ratios
@@ -61,9 +69,9 @@ def quote(symbol: str = typer.Argument(..., help="NSE or BSE stock ticker (e.g. 
 [bold white]Market Capitalization:[/bold white] {format_crores(ratios.market_cap)}
 [bold white]Enterprise Value:[/bold white] {format_crores(ratios.enterprise_value)}
 [bold white]Beta:[/bold white] {profile.beta if profile.beta is not None else 'N/A'}
-[bold white]ROE / ROCE:[/bold white] {format_percentage(ratios.roe)} / {format_percentage(ratios.roce)}
-[bold white]Debt to Equity:[/bold white] {f'{ratios.debt_to_equity:.2f}' if ratios.debt_to_equity is not None else 'N/A'}
-[bold white]Free Cash Flow (TTM):[/bold white] {format_crores(ratios.free_cash_flow)}"""
+[bold white]ROE / ROCE / ROIC:[/bold white] {format_percentage(ratios.roe)} / {format_percentage(ratios.roce)} / {format_percentage(ratios.roic)}
+[bold white]Debt to Equity:[/bold white] {f'{ratios.debt_to_equity:.2f}' if ratios.debt_to_equity is not None else 'N/A'} (Total with Leases: {f'{ratios.total_debt_to_equity:.2f}' if ratios.total_debt_to_equity is not None else 'N/A'})
+[bold white]Free Cash Flow (Reported):[/bold white] {format_crores(ratios.free_cash_flow_reported)}"""
 
     console.print(Panel(content, title=f"[bold green]🇮🇳 {profile.symbol} Profile[/bold green]", border_style="cyan"))
 
@@ -80,15 +88,18 @@ def ratios(symbol: str = typer.Argument(..., help="Stock ticker symbol")):
     table.add_column("Value (Indian Reporting)", style="bold white", justify="right")
     table.add_column("Benchmark / Standard", style="dim")
 
+    table.add_row("Return on Invested Capital (ROIC)", format_percentage(r.roic), "> 15.0% (Economic Value Added)")
     table.add_row("Return on Capital Employed (ROCE)", format_percentage(r.roce), "> 18.0% (Quality Compounder)")
-    table.add_row("Return on Equity (ROE)", format_percentage(r.roe), "> 15.0% (Good profitability)")
-    table.add_row("Debt to Equity Ratio (D/E)", f"{r.debt_to_equity:.2f}" if r.debt_to_equity is not None else "N/A", "< 0.50 (Conservative leverage)")
+    table.add_row("Return on Equity (ROE)", format_percentage(r.roe), "> 15.0% (Shareholder profitability)")
+    table.add_row("Interest-Bearing Debt to Equity", f"{r.debt_to_equity:.2f}" if r.debt_to_equity is not None else "N/A", "< 0.50 (Conservative leverage)")
+    table.add_row("Total Debt + Leases to Equity", f"{r.total_debt_to_equity:.2f}" if r.total_debt_to_equity is not None else "N/A", "Includes lease obligations")
     table.add_row("Interest Coverage Ratio", f"{r.interest_coverage:.1f}x" if r.interest_coverage is not None else "N/A", "> 3.0x (Solvency buffer)")
+    table.add_row("Operating Working Capital (NWC)", format_crores(r.working_capital.operating_nwc), "Excludes cash and borrowings")
+    table.add_row("Change in Operating NWC (ΔNWC)", format_crores(r.working_capital.change_in_operating_nwc), "Annual cash outflow into working capital")
     table.add_row("Free Cash Flow Yield", format_percentage(r.fcf_yield), "> 3.0% (Strong cash generation)")
     table.add_row("EV / EBITDA", f"{r.ev_to_ebitda:.2f}x" if r.ev_to_ebitda is not None else "N/A", "< 15.0x (Reasonable multiple)")
     table.add_row("Operating Profit Margin", format_percentage(r.operating_margin), "Core business pricing power")
     table.add_row("Net Profit Margin", format_percentage(r.net_profit_margin), "Net margin after taxes & interest")
-    table.add_row("Asset Turnover", f"{r.asset_turnover:.2f}x" if r.asset_turnover is not None else "N/A", "Revenue generated per ₹ of Assets")
 
     console.print(table)
 
@@ -135,49 +146,143 @@ def dupont(
 @app.command()
 def dcf(
     symbol: str = typer.Argument(..., help="Stock ticker symbol"),
-    growth: Optional[float] = typer.Option(None, "--growth", "-g", help="Annual FCF growth rate (e.g. 0.12 for 12%)"),
-    wacc: Optional[float] = typer.Option(None, "--wacc", "-w", help="Discount rate (e.g. 0.12 for 12%)"),
+    growth: Optional[float] = typer.Option(None, "--growth", "-g", help="Annual growth rate (e.g. 0.12 for 12%)"),
+    wacc: Optional[float] = typer.Option(None, "--wacc", "-w", help="Discount rate override (e.g. 0.12 for 12%)"),
     terminal_growth: float = typer.Option(DEFAULT_TERMINAL_GROWTH_RATE, "--terminal-growth", "-t", help="Perpetual growth rate"),
+    years: int = typer.Option(5, "--years", "-y", help="Forecast years (5 or 10)"),
+    scenarios: bool = typer.Option(False, "--scenarios", help="Run Bear, Base, and Bull valuation scenarios"),
+    reverse: bool = typer.Option(False, "--reverse", help="Run Reverse DCF solving for market-implied growth"),
 ):
-    """Run 5-Year FCFF DCF Valuation with a 2D sensitivity table (WACC vs. g)."""
-    with console.status(f"[bold cyan]Running DCF valuation for {symbol}...[/bold cyan]"):
+    """Run FCFF DCF Valuation with explicit forecasts, WACC, and 2D sensitivity table."""
+    with console.status(f"[bold cyan]Analyzing {symbol}...[/bold cyan]"):
         profile = fetch_company_data(symbol)
-        res = calculate_dcf(
-            profile,
-            forecast_years=5,
-            fcf_growth_rate=growth,
-            wacc=wacc,
-            terminal_growth_rate=terminal_growth,
+
+    if profile.is_financial_institution():
+        console.print(f"[bold yellow]⚠️ {profile.company_name} is a Financial Institution ({profile.sector} / {profile.industry}).[/bold yellow]")
+        console.print("[dim]Industrial FCFF/WACC DCF cannot be applied to banks/NBFCs because debt is operating funding. Running Residual Income Model (RIM)...[/dim]")
+        rim = calculate_residual_income_valuation(profile)
+
+        table = Table(title=f"Residual Income Valuation: {profile.company_name} ({profile.symbol})", header_style="bold blue")
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="bold white", justify="right")
+        table.add_row("Current Share Price", f"₹{rim.current_share_price:,.2f}")
+        table.add_row("Book Value per Share", f"₹{rim.book_value_per_share:,.2f}")
+        table.add_row("Normalized ROE", format_percentage(rim.normalized_roe))
+        table.add_row("Cost of Equity (Ke)", format_percentage(rim.cost_of_equity))
+        table.add_row("Sustainable Growth (g)", format_percentage(rim.sustainable_growth_rate))
+        table.add_row("Justified P/B Multiple", f"{rim.justified_pb_ratio:.2f}x")
+        table.add_row("Justified Share Price", f"₹{rim.justified_price_per_share:,.2f}")
+        table.add_row("Intrinsic Value (RIM)", f"₹{rim.intrinsic_value_per_share:,.2f}")
+        table.add_row("Margin of Safety", f"{rim.margin_of_safety_pct * 100:+.1f}%")
+        console.print(table)
+        return
+
+    if reverse:
+        res = reverse_dcf(profile, wacc=wacc, terminal_growth_rate=terminal_growth)
+        rev_table = Table(title=f"Reverse DCF: Market-Implied Expectations for {profile.symbol}", header_style="bold magenta")
+        rev_table.add_column("Metric", style="cyan")
+        rev_table.add_column("Value", style="bold white", justify="right")
+        rev_table.add_row("Current Market Price", f"₹{res['market_price']:,.2f}")
+        rev_table.add_row("Implied 5-Year Revenue CAGR", str(res["implied_5y_cagr_pct"]))
+        rev_table.add_row("Market Expectation Assessment", str(res["market_expectation_assessment"]))
+        console.print(rev_table)
+        return
+
+    if scenarios:
+        scen_results = run_scenario_analysis(profile, base_growth=growth)
+        s_table = Table(title=f"Scenario Valuation Analysis: {profile.symbol}", header_style="bold green")
+        s_table.add_column("Scenario", style="bold cyan")
+        s_table.add_column("WACC", justify="right")
+        s_table.add_column("Term Growth (g)", justify="right")
+        s_table.add_column("Intrinsic Value (₹)", justify="right", style="bold white")
+        s_table.add_column("Current Price (₹)", justify="right")
+        s_table.add_column("Margin of Safety", justify="right")
+
+        for name, r in scen_results.items():
+            col = "green" if r.bridge.margin_of_safety_pct >= 0 else "red"
+            s_table.add_row(
+                name,
+                format_percentage(r.wacc),
+                format_percentage(r.terminal_growth_rate),
+                f"₹{r.bridge.intrinsic_value_per_share:,.2f}",
+                f"₹{r.bridge.current_share_price:,.2f}",
+                f"[{col}]{r.bridge.margin_of_safety_pct * 100:+.1f}%[/{col}]",
+            )
+        console.print(s_table)
+        return
+
+    # Standard DCF run
+    asm = ForecastAssumptions(
+        forecast_years=years,
+        revenue_growth_rates=[growth] * years if growth is not None else None,
+        wacc_override=wacc,
+        terminal_growth_rate=terminal_growth,
+    )
+    res = calculate_dcf(profile, forecast_years=years, assumptions=asm)
+
+    # 1. Forecast Schedule Table
+    f_table = Table(title=f"{years}-Year Explicit Financial Forecasts: {profile.symbol}", header_style="bold cyan")
+    f_table.add_column("Year", justify="center")
+    f_table.add_column("Rev Growth", justify="right")
+    f_table.add_column("Revenue (₹ Cr)", justify="right")
+    f_table.add_column("EBIT Margin", justify="right")
+    f_table.add_column("NOPAT (₹ Cr)", justify="right")
+    f_table.add_column("CapEx (₹ Cr)", justify="right")
+    f_table.add_column("ΔNWC (₹ Cr)", justify="right")
+    f_table.add_column("FCFF (₹ Cr)", justify="right", style="bold white")
+    f_table.add_column("PV FCFF (₹ Cr)", justify="right")
+
+    for f in res.annual_forecasts:
+        f_table.add_row(
+            f"Yr {f.year}",
+            f"{f.revenue_growth * 100:.1f}%",
+            f"₹{f.revenue / CRORE_DIVISOR:,.1f}",
+            f"{f.operating_margin * 100:.1f}%",
+            f"₹{f.nopat / CRORE_DIVISOR:,.1f}",
+            f"₹{f.capex / CRORE_DIVISOR:,.1f}",
+            f"₹{f.change_in_nwc / CRORE_DIVISOR:,.1f}",
+            f"₹{f.fcff / CRORE_DIVISOR:,.1f}",
+            f"₹{f.pv_fcff / CRORE_DIVISOR:,.1f}",
         )
+    console.print(f_table)
 
-    # Valuation summary table
-    summary = Table(title=f"5-Year FCFF DCF Valuation: {profile.company_name} ({profile.symbol})", header_style="bold green")
-    summary.add_column("Valuation Metric", style="cyan")
-    summary.add_column("Value", style="bold white", justify="right")
+    # 2. Enterprise-to-Equity Bridge
+    b = res.bridge
+    b_table = Table(title=f"Enterprise Value to Equity Value Bridge: {profile.company_name} ({profile.symbol})", header_style="bold green")
+    b_table.add_column("Valuation Bridge Component", style="cyan")
+    b_table.add_column("Value (₹ Cr / ₹ Per Share)", style="bold white", justify="right")
 
-    summary.add_row("Current Share Price", f"₹{res.current_price:,.2f}")
-    summary.add_row("Intrinsic Value per Share", f"₹{res.intrinsic_value_per_share:,.2f}")
-    upside_color = "green" if res.upside_downside_pct >= 0 else "red"
-    summary.add_row("Implied Upside / Downside", f"[{upside_color}]{res.upside_downside_pct * 100:+.1f}%[/{upside_color}]")
-    summary.add_row("Applied Discount Rate (WACC)", format_percentage(res.wacc))
-    summary.add_row("Terminal Growth Rate (g)", format_percentage(res.terminal_growth_rate))
-    summary.add_row("Present Value of 5Y Cash Flows", format_crores(res.sum_pv_fcff))
-    summary.add_row("Present Value of Terminal Value", format_crores(res.pv_terminal_value))
-    summary.add_row("Implied Enterprise Value", format_crores(res.enterprise_value))
-    summary.add_row("Implied Equity Value", format_crores(res.implied_equity_value))
-    console.print(summary)
+    b_table.add_row("Present Value of Explicit Forecasts", format_crores(b.sum_pv_fcff))
+    b_table.add_row(f"Present Value of Terminal Value ({b.terminal_value_pct_of_ev * 100:.1f}% of EV)", format_crores(b.pv_terminal_value))
+    b_table.add_row("Implied Enterprise Value", format_crores(b.enterprise_value))
+    b_table.add_row("(+) Total Liquid Cash & Short-Term Investments", format_crores(b.total_liquid_assets))
+    b_table.add_row("(-) Total Interest-Bearing Debt", format_crores(-b.total_interest_bearing_debt))
+    b_table.add_row("(-) Capital Lease Obligations", format_crores(-b.lease_liabilities))
+    b_table.add_row("(-) Non-Controlling (Minority) Interest", format_crores(-b.minority_interest))
+    b_table.add_row("Implied Equity Value", format_crores(b.implied_equity_value))
+    b_table.add_row("Diluted Shares Outstanding", f"{b.diluted_shares / 10_000_000:,.2f} Cr shares")
+    b_table.add_row("---", "---")
+    b_table.add_row("[bold]Intrinsic Value per Share[/bold]", f"[bold yellow]₹{b.intrinsic_value_per_share:,.2f}[/bold yellow]")
+    b_table.add_row("Current Share Price", f"₹{b.current_share_price:,.2f}")
+    upside_color = "green" if b.margin_of_safety_pct >= 0 else "red"
+    b_table.add_row("Margin of Safety (Implied Upside/Downside)", f"[{upside_color}]{b.margin_of_safety_pct * 100:+.1f}%[/{upside_color}]")
+    console.print(b_table)
 
-    # Sensitivity grid table
+    # 3. Sensitivity Matrix
     sens_table = Table(title="2D Sensitivity Matrix: Intrinsic Value per Share (₹)", header_style="bold magenta")
     sens_table.add_column("WACC \\ g", style="bold cyan")
     for col in res.sensitivity_table.columns:
         sens_table.add_column(str(col), justify="right")
 
     for idx, row in res.sensitivity_table.iterrows():
-        row_vals = [f"₹{v:,.2f}" if v is not None and str(v) != "nan" else "N/A" for v in row]
+        row_vals = [f"₹{v:,.2f}" if str(v) != "nan" else "N/A" for v in row]
         sens_table.add_row(str(idx), *row_vals)
 
     console.print(sens_table)
+
+    if res.warnings:
+        for w in res.warnings:
+            console.print(f"[bold yellow]⚠️ Note:[/bold yellow] [dim]{w}[/dim]")
 
 
 @app.command()
@@ -207,7 +312,6 @@ def screen(
 
         df = screener.screen(tickers, progress_callback=on_progress)
 
-    # Display results table
     table = Table(title=f"Screener Results ({preset.upper()})", header_style="bold green")
     table.add_column("Symbol", style="cyan")
     table.add_column("Mcap (₹ Cr)", justify="right")
@@ -241,7 +345,7 @@ def export(
         r = calculate_ratios(profile)
         d3 = decompose_dupont_3stage(profile)
         d5 = decompose_dupont_5stage(profile)
-        dcf_res = calculate_dcf(profile)
+        dcf_res = calculate_dcf(profile) if not profile.is_financial_institution() else None
         path = export_to_excel(profile, r, d3, d5, dcf_res, output)
 
     console.print(f"[bold green]✅ Research report successfully exported to:[/bold green] [bold cyan]{path}[/bold cyan]")
@@ -260,6 +364,9 @@ def chart(
             d5 = decompose_dupont_5stage(profile)
             plot_dupont_5stage(d5, save_path=output)
         else:
+            if profile.is_financial_institution():
+                console.print("[bold red]Cannot render industrial DCF chart for financial institution.[/bold red]")
+                return
             dcf_res = calculate_dcf(profile)
             plot_dcf_waterfall(dcf_res, save_path=output)
 

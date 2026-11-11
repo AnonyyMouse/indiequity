@@ -1,8 +1,9 @@
 """
 Test fixtures and mock financial statements for indiequity unit tests.
 
-Provides a realistic, mathematically consistent Indian small-cap company
-("Bharat Precision Ltd") so tests run completely offline and deterministically.
+Provides realistic, mathematically consistent Indian companies:
+1. 'Bharat Precision Ltd' (Industrial Small-Cap)
+2. 'Hindustan Commercial Bank' (Private Sector Bank)
 """
 
 import pandas as pd
@@ -15,22 +16,6 @@ def mock_indian_smallcap() -> FinancialProfile:
     """
     Returns a FinancialProfile representing a high-quality Indian small-cap:
     'Bharat Precision Ltd' (Ticker: BHARATPRE.NS)
-
-    Key Financials (in INR):
-    - Market Cap: ₹1,500 Cr (15,000,000,000)
-    - Revenue: ₹1,200 Cr (12,000,000,000)
-    - EBIT: ₹240 Cr (2,400,000,000)
-    - Interest Expense: ₹30 Cr (300,000,000)
-    - EBT: ₹210 Cr (2,100,000,000)
-    - Net Income: ₹157.2 Cr (1,572,000,000)
-    - Total Assets: ₹1,000 Cr (10,000,000,000)
-    - Current Liabilities: ₹200 Cr (2,000,000,000)
-    - Stockholders' Equity: ₹600 Cr (6,000,000,000)
-    - Total Debt: ₹200 Cr (2,000,000,000)
-    - Cash & Cash Equivalents: ₹50 Cr (500,000,000)
-    - Operating Cash Flow: ₹220 Cr (2,200,000,000)
-    - CapEx: ₹70 Cr (700,000,000)
-    - Depreciation & Amortization: ₹40 Cr (400,000,000)
     """
     col_date = "2024-03-31"
 
@@ -40,16 +25,21 @@ def mock_indian_smallcap() -> FinancialProfile:
         "EBIT": [2_400_000_000.0],
         "Interest Expense": [300_000_000.0],
         "Pretax Income": [2_100_000_000.0],
+        "Tax Provision": [528_000_000.0],
         "Net Income Common Stockholders": [1_572_000_000.0],
     }
     income_stmt = pd.DataFrame(income_data, index=[col_date]).T
 
     balance_data = {
         "Total Assets": [10_000_000_000.0],
+        "Current Assets": [4_000_000_000.0],
         "Current Liabilities": [2_000_000_000.0],
         "Stockholders Equity": [6_000_000_000.0],
         "Total Debt": [2_000_000_000.0],
+        "Current Debt": [500_000_000.0],
+        "Long Term Debt": [1_500_000_000.0],
         "Cash And Cash Equivalents": [500_000_000.0],
+        "Other Short Term Investments": [0.0],
     }
     balance_sheet = pd.DataFrame(balance_data, index=[col_date]).T
 
@@ -83,5 +73,58 @@ def mock_indian_smallcap() -> FinancialProfile:
         income_stmt=income_stmt,
         balance_sheet=balance_sheet,
         cash_flow=cash_flow,
+        latest_period_date="2024-03-31",
+        available_periods=["2024-03-31"],
+        raw_info=info,
+    )
+
+
+@pytest.fixture
+def mock_indian_bank() -> FinancialProfile:
+    """
+    Returns a FinancialProfile representing an Indian private sector bank:
+    'Hindustan Commercial Bank' (Ticker: HINDCOMM.NS)
+    """
+    col_date = "2024-03-31"
+
+    income_data = {
+        "Total Revenue": [25_000_000_000.0],
+        "Operating Income": [8_000_000_000.0],
+        "Pretax Income": [7_500_000_000.0],
+        "Net Income Common Stockholders": [5_600_000_000.0],
+    }
+    income_stmt = pd.DataFrame(income_data, index=[col_date]).T
+
+    balance_data = {
+        "Total Assets": [200_000_000_000.0],
+        "Stockholders Equity": [35_000_000_000.0],
+        "Total Deposits": [160_000_000_000.0],
+    }
+    balance_sheet = pd.DataFrame(balance_data, index=[col_date]).T
+
+    info = {
+        "currentPrice": 750.0,
+        "marketCap": 37_500_000_000.0,
+        "sharesOutstanding": 50_000_000.0,
+        "beta": 1.05,
+        "longName": "Hindustan Commercial Bank Ltd",
+        "sector": "Financial Services",
+        "industry": "Banks - Regional",
+    }
+
+    return FinancialProfile(
+        symbol="HINDCOMM.NS",
+        company_name="Hindustan Commercial Bank Ltd",
+        sector="Financial Services",
+        industry="Banks - Regional",
+        current_price=750.0,
+        market_cap=37_500_000_000.0,
+        shares_outstanding=50_000_000.0,
+        beta=1.05,
+        income_stmt=income_stmt,
+        balance_sheet=balance_sheet,
+        cash_flow=pd.DataFrame(),
+        latest_period_date="2024-03-31",
+        available_periods=["2024-03-31"],
         raw_info=info,
     )

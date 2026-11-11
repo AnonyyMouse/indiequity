@@ -9,7 +9,7 @@ from indiequity.dcf import calculate_dcf, estimate_wacc
 
 def test_estimate_wacc(mock_indian_smallcap: FinancialProfile):
     """Verify estimated WACC falls within standard Indian market bounds."""
-    wacc = estimate_wacc(mock_indian_smallcap)
+    wacc, ke, kd_at, w_eq, w_d = estimate_wacc(mock_indian_smallcap)
     # Indian small-cap WACC with Beta ~1.15, Rf 7%, ERP 6.5% should be ~11% - 15%
     assert 0.09 <= wacc <= 0.17
 

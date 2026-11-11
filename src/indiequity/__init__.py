@@ -3,12 +3,15 @@ indiequity: Indian Equity Research Toolkit
 =========================================
 A Python toolkit for small-cap & mid-cap equity research on Indian markets (NSE & BSE).
 Provides:
-- Public fundamental financial statement ingestion
-- Core ratios: ROE, ROCE, Debt/Equity, Interest Coverage, EV/EBITDA, FCF Yield
+- Public fundamental financial statement ingestion with chronological sorting
+- Core ratios: ROE, ROCE, ROIC, Debt/Equity, Interest Coverage, EV/EBITDA, FCF Yield
+- Non-cash Operating Working Capital (NWC) and ΔNWC tracking
 - 3-Stage and 5-Stage DuPont decomposition
 - Configurable stock screening with preset Indian investment strategies
-- 5-Year FCFF DCF valuation engine with 2D sensitivity analysis
-- Visual charting and Excel/CSV export
+- 5-Year and 10-Year FCFF DCF valuation with sustainable terminal reinvestment & 2D sensitivity
+- Bank and Financial Institution Residual Income Model (RIM) & Justified P/B
+- Reverse DCF & Scenario Analysis (Bear/Base/Bull)
+- Visual charting and multi-tab Excel/CSV export
 """
 
 from indiequity.cache import FinancialCache
@@ -25,10 +28,20 @@ from indiequity.config import (
 )
 from indiequity.data import FinancialProfile, fetch_company_data
 from indiequity.dcf import (
+    AnnualForecast,
     DCFResult,
+    EnterpriseToEquityBridge,
+    ForecastAssumptions,
+    InvalidValuationInputError,
+    ResidualIncomeResult,
+    UnsupportedValuationModelError,
     calculate_dcf,
+    calculate_fcff_item,
+    calculate_residual_income_valuation,
     estimate_wacc,
     generate_sensitivity_matrix,
+    reverse_dcf,
+    run_scenario_analysis,
 )
 from indiequity.dupont import (
     DuPont3Stage,
@@ -37,7 +50,12 @@ from indiequity.dupont import (
     decompose_dupont_5stage,
 )
 from indiequity.export import export_screener_to_excel, export_to_csv, export_to_excel
-from indiequity.ratios import RatioMetrics, calculate_ratios
+from indiequity.ratios import (
+    CapitalStructure,
+    RatioMetrics,
+    WorkingCapitalMetrics,
+    calculate_ratios,
+)
 from indiequity.screener import (
     NIFTY_50_TICKERS,
     NIFTY_SMALLCAP_PRESET,
@@ -48,7 +66,7 @@ from indiequity.screener import (
     StockScreener,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __author__ = "Ayush"
 
 __all__ = [
@@ -64,6 +82,8 @@ __all__ = [
     "FinancialCache",
     "FinancialProfile",
     "fetch_company_data",
+    "CapitalStructure",
+    "WorkingCapitalMetrics",
     "RatioMetrics",
     "calculate_ratios",
     "DuPont3Stage",
@@ -77,8 +97,18 @@ __all__ = [
     "PRESET_QUALITY_SMALLCAP",
     "PRESET_DEEP_VALUE",
     "PRESET_HIGH_COMPOUNDER",
+    "AnnualForecast",
+    "EnterpriseToEquityBridge",
+    "ForecastAssumptions",
     "DCFResult",
+    "ResidualIncomeResult",
+    "InvalidValuationInputError",
+    "UnsupportedValuationModelError",
+    "calculate_fcff_item",
     "calculate_dcf",
+    "calculate_residual_income_valuation",
+    "reverse_dcf",
+    "run_scenario_analysis",
     "estimate_wacc",
     "generate_sensitivity_matrix",
     "plot_dupont_5stage",

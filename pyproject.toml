@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "indiequity"
+version = "0.1.0"
+description = "Indian equity research toolkit for NSE/BSE fundamental analysis, ratios, screening, and DCF valuation."
+readme = "README.md"
+authors = [
+    { name = "Ayush", email = "research@indiequity.local" }
+]
+license = { text = "MIT" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+keywords = [
+    "finance",
+    "equity-research",
+    "nse",
+    "bse",
+    "nifty",
+    "dcf-valuation",
+    "fundamental-analysis",
+    "dupont-analysis",
+    "india-stock-market",
+    "stock-screener"
+]
+requires-python = ">=3.10"
+dependencies = [
+    "yfinance>=0.2.40",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "openpyxl>=3.1.0",
+    "matplotlib>=3.7.0",
+    "rich>=13.5.0",
+    "typer>=0.12.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "ruff>=0.4.0",
+    "build>=1.2.0",
+    "twine>=5.0.0",
+    "jupyter>=1.0.0",
+]
+
+[project.scripts]
+indiequity = "indiequity.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"

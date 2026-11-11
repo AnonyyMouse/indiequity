@@ -37,6 +37,7 @@ from indiequity.dcf import (
     run_scenario_analysis,
 )
 from indiequity.dupont import decompose_dupont_3stage, decompose_dupont_5stage
+from indiequity.piotroski import calculate_piotroski_score
 from indiequity.export import export_screener_to_excel, export_to_excel
 from indiequity.ratios import calculate_ratios
 from indiequity.screener import (
@@ -164,6 +165,37 @@ def dupont(
         table.add_row("Resulting Calculated ROE", "Product of 5 factors", format_percentage(d5.calculated_roe))
         console.print(table)
         console.print(f"[bold yellow]Diagnosis:[/bold yellow] {d5.interpretation}")
+
+
+@app.command()
+def piotroski(symbol: str = typer.Argument(..., help="Stock ticker symbol")):
+    """Compute the 9-point Piotroski F-Score (financial health) for a stock."""
+    with console.status(f"[bold cyan]Calculating Piotroski F-Score for {symbol}...[/bold cyan]"):
+        profile = fetch_company_data(symbol)
+        p = calculate_piotroski_score(profile)
+
+    def mark(passed: bool) -> str:
+        return "[bold green]PASS (1)[/bold green]" if passed else "[bold red]FAIL (0)[/bold red]"
+
+    table = Table(title=f"Piotroski F-Score: {profile.company_name} ({profile.symbol})", header_style="bold blue")
+    table.add_column("Category", style="dim")
+    table.add_column("Signal", style="cyan")
+    table.add_column("Test", style="dim")
+    table.add_column("Result", justify="right")
+
+    table.add_row("Profitability", "1. ROA Positive", f"ROA = {format_percentage(p.roa)}", mark(p.roa_positive))
+    table.add_row("Profitability", "2. Operating Cash Flow Positive", "CFO > 0", mark(p.cfo_positive))
+    table.add_row("Profitability", "3. ROA Improving", f"{format_percentage(p.prev_roa)} -> {format_percentage(p.roa)}", mark(p.roa_improved))
+    table.add_row("Profitability", "4. Accrual Quality", "CFO > Net Income", mark(p.accrual_quality))
+    table.add_row("Leverage", "5. Leverage Decreasing", f"LT Debt/Assets {p.prev_leverage_ratio:.2f} -> {p.leverage_ratio:.2f}", mark(p.leverage_decreased))
+    table.add_row("Leverage", "6. Liquidity Improving", f"Current Ratio {p.prev_current_ratio:.2f} -> {p.current_ratio:.2f}", mark(p.liquidity_improved))
+    table.add_row("Leverage", "7. No Dilution", "Shares outstanding not increased", mark(p.no_dilution))
+    table.add_row("Efficiency", "8. Gross Margin Improving", f"{format_percentage(p.prev_gross_margin)} -> {format_percentage(p.gross_margin)}", mark(p.gross_margin_improved))
+    table.add_row("Efficiency", "9. Asset Turnover Improving", f"{p.prev_asset_turnover:.2f}x -> {p.asset_turnover:.2f}x", mark(p.asset_turnover_improved))
+    table.add_row("", "[bold]Piotroski F-Score[/bold]", "Out of 9", f"[bold]{p.score} / 9[/bold]")
+
+    console.print(table)
+    console.print(f"[bold yellow]Diagnosis:[/bold yellow] {p.interpretation}")
 
 
 @app.command()

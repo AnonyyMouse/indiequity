@@ -12,6 +12,7 @@ Provides:
 """
 
 from indiequity.cache import FinancialCache
+from indiequity.charts import plot_dcf_waterfall, plot_dupont_5stage
 from indiequity.config import (
     CRORE_DIVISOR,
     DEFAULT_EQUITY_RISK_PREMIUM,
@@ -23,12 +24,19 @@ from indiequity.config import (
     resolve_ticker,
 )
 from indiequity.data import FinancialProfile, fetch_company_data
+from indiequity.dcf import (
+    DCFResult,
+    calculate_dcf,
+    estimate_wacc,
+    generate_sensitivity_matrix,
+)
 from indiequity.dupont import (
     DuPont3Stage,
     DuPont5Stage,
     decompose_dupont_3stage,
     decompose_dupont_5stage,
 )
+from indiequity.export import export_screener_to_excel, export_to_csv, export_to_excel
 from indiequity.ratios import RatioMetrics, calculate_ratios
 from indiequity.screener import (
     NIFTY_50_TICKERS,
@@ -69,4 +77,13 @@ __all__ = [
     "PRESET_QUALITY_SMALLCAP",
     "PRESET_DEEP_VALUE",
     "PRESET_HIGH_COMPOUNDER",
+    "DCFResult",
+    "calculate_dcf",
+    "estimate_wacc",
+    "generate_sensitivity_matrix",
+    "plot_dupont_5stage",
+    "plot_dcf_waterfall",
+    "export_to_excel",
+    "export_screener_to_excel",
+    "export_to_csv",
 ]
